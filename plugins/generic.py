@@ -46,6 +46,10 @@ obfuscatorhtml_re = re.compile(
 )
 unpack_packer_re = re.compile(
     r'''(?P<data>eval\(function\(p,a,c,k,e,(?:d|r)\).*\))''')
+
+unpack_wise_re = re.compile(
+    r'''(?P<data>eval\(function\(w,i,s,e\).*\))''')
+
 unpack_unescape_re = re.compile(r"""
     <script[^<>]*>[^>]*
     document.write\(unescape\(\s*
@@ -153,6 +157,104 @@ class Packer(object):
         return self.beginstr + source + self.endstr
 
 
+class Wise(object):
+    import os
+    """
+    Unpacker for w.i.s.e
+
+    """
+
+    #wise_values_re = re.compile(r'^;\)\)(\'|\")([a-z0-9]+)(\'|\"),(\'|\")([a-z0-9]+)(\'|\"),(\'|\")([a-z0-9]+)(\'|\"),(\'|\")([a-z0-9]+)(\'|\")\)')
+    #wise_values_re = re.compile(r'}\(\'[a-z0-9]+\',\'[a-z0-9]+\',\'[a-z0-9]+\',\'[a-z0-9]+\'\)\);^')
+    wise_values_re = re.compile(r'\}\(\'([a-z0-9]+)\',\'([a-z0-9]+)\',\'([a-z0-9]+)\',\'([a-z0-9]+)\'\)\)')
+
+    def __init__(self):
+        self.beginstr = ''
+        self.endstr = ''
+
+    def detect(self, source):
+        """Detects whether `source` is W.I.S.E. coded."""
+        mystr = source.replace(' ', '').find('eval(function(w,i,s,e')
+        
+        if(mystr > 0):
+            self.beginstr = source[:mystr]
+        if(mystr != -1):
+            """ Find endstr"""
+            if(source.split("')))", 1)[0] == source):
+                try:
+                    self.endstr = source.split("}))", 1)[1]
+                except IndexError:
+                    self.endstr = ''
+            else:
+                self.endstr = source.split("')))", 1)[1]
+        return (mystr != -1)
+
+    def unpack(self, source):
+        """Unpacks W.I.S.E. packed js code."""
+        w = None
+        i = None
+        s = None
+        e = None
+
+        source = source.replace('\n', '').replace(' ', '')
+
+        wise_values_m = self.wise_values_re.search(source)
+
+        if wise_values_m:
+            w = wise_values_m.group(1)
+            log.trace('w: {}', w)
+            i = wise_values_m.group(2)
+            log.trace('i: {}', i)
+            s = wise_values_m.group(3)
+            log.trace('s: {}', s)
+            e = wise_values_m.group(4)
+            log.trace('e: {}', e)
+        
+        decoded_source = self._decode(w, i, s, e)
+        print('decoded_source: ' + decoded_source)
+        return decoded_source
+
+    def _decode(self, w, i, s, e):
+        # Source: https://raw.githubusercontent.com/dandygithub/kodi/, 
+        # plugin.video.tivix.net ver. 2.4.4
+        A1=0
+        A2=0
+        A3=0
+        L1=[]
+        L2=[]
+
+        while True:
+            if A1<5: L2.append(w[A1])
+            elif A1<len(w): L1.append(w[A1])
+            A1+=1
+            
+            if A2<5: L2.append(i[A2])
+            elif A2<len(i): L1.append(i[A2])
+            A2+=1
+            
+            if A3<5: L2.append(s[A3])
+            elif A3<len(s): L1.append(s[A3])
+            A3+=1
+            
+            if(len(w)+len(i)+len(s)+len(e)==len(L1)+len(L2)+len(e)): break
+
+        B1=''.join(L1)
+        B2=''.join(L2)
+        A2=0
+        A1=0
+        L3=[]
+        while A1<len(L1):
+            C1=-1
+            if ord(B2[A2])%2: C1=1
+            L3.append(unichr(int(B1[A1:A1+2],36)-C1))
+            A2+=1
+            if A2>=len(L2):A2=0
+            A1+=2
+        
+        return u''.join(L3)
+
+
+
 class Unbaser(object):
     """Functor for a given base. Will efficiently convert
     strings to natural numbers."""
@@ -206,6 +308,27 @@ def unpack_packer(text):
                     text = text.replace(data, unpacked)
                 except UnpackingError:
                     pass
+    return text
+
+
+def unpack_wise(text):
+    """unpack w.i.s.e"""
+    wise = Wise()
+    while True:
+        wise_list = unpack_wise_re.findall(text)
+
+        if not wise_list:
+            break
+
+        print('len(wise_list)=' + str(len(wise_list)))
+        data = wise_list[0]
+
+        if wise.detect(data):
+            try:
+                unpacked = wise.unpack(data).replace('\\', '')
+                text = text.replace(data, unpacked)
+            except UnpackingError:
+                pass
     return text
 
 
@@ -274,6 +397,7 @@ def unpack_u_m3u8(text):
 def unpack(text):
     """ unpack html source code """
     text = unpack_packer(text)
+    text = unpack_wise(text)
     text = unpack_obfuscatorhtml(text)
     text = unpack_unescape(text)
     text = unpack_source_url(text, unpack_source_url_re_1)
