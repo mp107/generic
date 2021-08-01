@@ -161,11 +161,8 @@ class Wise(object):
     import os
     """
     Unpacker for w.i.s.e
-
     """
 
-    #wise_values_re = re.compile(r'^;\)\)(\'|\")([a-z0-9]+)(\'|\"),(\'|\")([a-z0-9]+)(\'|\"),(\'|\")([a-z0-9]+)(\'|\"),(\'|\")([a-z0-9]+)(\'|\")\)')
-    #wise_values_re = re.compile(r'}\(\'[a-z0-9]+\',\'[a-z0-9]+\',\'[a-z0-9]+\',\'[a-z0-9]+\'\)\);^')
     wise_values_re = re.compile(r'\}\(\'([a-z0-9]+)\',\'([a-z0-9]+)\',\'([a-z0-9]+)\',\'([a-z0-9]+)\'\)\)')
 
     def __init__(self):
@@ -202,16 +199,11 @@ class Wise(object):
 
         if wise_values_m:
             w = wise_values_m.group(1)
-            log.trace('w: {}', w)
             i = wise_values_m.group(2)
-            log.trace('i: {}', i)
             s = wise_values_m.group(3)
-            log.trace('s: {}', s)
             e = wise_values_m.group(4)
-            log.trace('e: {}', e)
         
         decoded_source = self._decode(w, i, s, e)
-        print('decoded_source: ' + decoded_source)
         return decoded_source
 
     def _decode(self, w, i, s, e):
@@ -252,7 +244,6 @@ class Wise(object):
             A1+=2
         
         return u''.join(L3)
-
 
 
 class Unbaser(object):
@@ -320,7 +311,6 @@ def unpack_wise(text):
         if not wise_list:
             break
 
-        print('len(wise_list)=' + str(len(wise_list)))
         data = wise_list[0]
 
         if wise.detect(data):
