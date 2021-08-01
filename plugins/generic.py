@@ -157,8 +157,6 @@ class Packer(object):
         return self.beginstr + source + self.endstr
 
 class Playerjs(object):
-    # base64 regex source: https://stackoverflow.com/a/475217/7191011
-    #url_coded_re = re.compile(r'(playerjs:\/\/)?#2(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?')
     url_coded_re = re.compile(r'#2[A-Za-z0-9+/=]+')
 
     v1 = None
@@ -184,22 +182,14 @@ class Playerjs(object):
         result = regex_m and regex_m.group(2)
         if result:
             self.v3 = result
-        print('v1')
-        print(self.v1)
-        print('v2')
-        print(self.v2)
-        print('v3')
-        print(self.v3)
 
     def decode(self, content):
-        log.trace('url_code: {}', content)
         content_decoded = self.try_decode(content)
-        log.trace('url_code decoded: {}', content_decoded)
         
         content_decoded = content_decoded.replace('{v1}', self.v1)
         content_decoded = content_decoded.replace('{v2}', self.v2)
         content_decoded = content_decoded.replace('{v3}', self.v3)
-        log.trace('url_code fully decoded: {}', content_decoded)
+
         return content_decoded
 
     def clear_url_code(self, url_code):
@@ -231,7 +221,6 @@ class Playerjs(object):
     def try_decode(self, encoded_url):
         try:
             cleaned_up_url = str(self.clear_url_code(encoded_url))
-            print('Cleaned up URL: {}', cleaned_up_url)
 
             # Add possobly missing padding at the end of the base64
             # Source: https://stackoverflow.com/a/9807138/7191011
@@ -240,7 +229,6 @@ class Playerjs(object):
                 cleaned_up_url += b'='* (4 - missing_padding)
 
             url = base64.b64decode(cleaned_up_url)
-            print('Decoded URL: {}', url)
             return url
         except:
             raise PlayerjsDecodeError()
