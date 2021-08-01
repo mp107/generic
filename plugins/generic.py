@@ -65,6 +65,10 @@ class UnpackingError(Exception):
     """Badly packed source or general error."""
 
 
+class PlayerjsDecodeError(Exception):
+    """Badly decoded PlayerJS URL, not PlayerJS URL or general error."""
+
+
 class Packer(object):
     """
     Unpacker for Dean Edward's p.a.c.k.e.r
@@ -152,6 +156,83 @@ class Packer(object):
             return source[startpoint:]
         return self.beginstr + source + self.endstr
 
+class Playerjs(object):
+    url_coded_re = re.compile(r'#2[A-Za-z0-9+/=]+')
+
+    v1 = None
+    v2 = None
+    v3 = None
+
+    v1_re = re.compile(r'firstIpProtect\s*=\s*(\'|\")([^\'^\"]+)(\'|\")')
+    v2_re = re.compile(r'secondIpProtect\s*=\s*(\'|\")([^\'^\"]+)(\'|\")')
+    v3_re = re.compile(r'portProtect\s*=\s*(\'|\")([^\'^\"]+)(\'|\")')
+
+    def __init__(self, content):
+        regex_m = self.v1_re.search(content)
+        result = regex_m and regex_m.group(2)
+        if result:
+            self.v1 = result
+
+        regex_m = self.v2_re.search(content)
+        result = regex_m and regex_m.group(2)
+        if result:
+            self.v2 = result
+
+        regex_m = self.v3_re.search(content)
+        result = regex_m and regex_m.group(2)
+        if result:
+            self.v3 = result
+
+    def decode(self, content):
+        content_decoded = self.try_decode(content)
+        
+        content_decoded = content_decoded.replace('{v1}', self.v1)
+        content_decoded = content_decoded.replace('{v2}', self.v2)
+        content_decoded = content_decoded.replace('{v3}', self.v3)
+
+        return content_decoded
+
+    def clear_url_code(self, url_code):
+        # Source: https://raw.githubusercontent.com/dandygithub/kodi/, 
+        # plugin.video.tivix.net ver. 2.4.4
+        const_begin_musor = '//'
+        size_musor_symbols = 48
+        Musor_keys = []
+        url_code = url_code.replace('#2','')
+        begin_find = 0
+        while True:
+            if (not const_begin_musor in url_code):
+                break
+            pos_begin_musor = url_code.find(const_begin_musor, begin_find)
+            if (not pos_begin_musor > 0):
+                begin_find = 0
+                continue
+            key1 = url_code[pos_begin_musor:pos_begin_musor + size_musor_symbols+2]
+            if (const_begin_musor[1:] in key1[2:]):
+                begin_find = begin_find+1
+                continue
+            if (not key1 in Musor_keys):
+                Musor_keys.append(key1)
+            url_code = url_code.replace(key1, '')
+            begin_find = 0
+            continue
+        return url_code
+
+    def try_decode(self, encoded_url):
+        try:
+            cleaned_up_url = str(self.clear_url_code(encoded_url))
+
+            # Add possibly missing padding at the end of the base64
+            # Source: https://stackoverflow.com/a/9807138/7191011
+            missing_padding = len(cleaned_up_url) % 4
+            if missing_padding:
+                cleaned_up_url += b'='* (4 - missing_padding)
+
+            url = base64.b64decode(cleaned_up_url)
+            return url
+        except:
+            raise PlayerjsDecodeError()
+
 
 class Unbaser(object):
     """Functor for a given base. Will efficiently convert
@@ -206,6 +287,19 @@ def unpack_packer(text):
                     text = text.replace(data, unpacked)
                 except UnpackingError:
                     pass
+    return text
+
+
+def unpack_playerjs(text):
+    """ Unpack PlayerJS encoded URLs """
+    playerjs = Playerjs(text)
+    playerjs_list = playerjs.url_coded_re.findall(text)
+    if playerjs_list:
+        for data in playerjs_list:
+            try:
+                text = text.replace(data, playerjs.decode(data))
+            except PlayerjsDecodeError:
+                pass
     return text
 
 
@@ -279,6 +373,8 @@ def unpack(text):
     text = unpack_source_url(text, unpack_source_url_re_1)
     text = unpack_source_url(text, unpack_source_url_re_2)
     text = unpack_u_m3u8(text)
+    # decode PlayerJS "#2..." file URLs
+    text = unpack_playerjs(text)
     return text
 
 
