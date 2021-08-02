@@ -283,6 +283,8 @@ class Playerjs(object):
         if not content_decoded:
             return content
 
+        content_decoded = content_decoded.decode('utf-16')
+
         if self.v1:
             content_decoded = content_decoded.replace('{v1}', self.v1)
 
