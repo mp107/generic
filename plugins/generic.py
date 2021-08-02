@@ -280,9 +280,17 @@ class Playerjs(object):
     def decode(self, content):
         content_decoded = self.try_decode(content)
         
-        content_decoded = content_decoded.replace('{v1}', self.v1)
-        content_decoded = content_decoded.replace('{v2}', self.v2)
-        content_decoded = content_decoded.replace('{v3}', self.v3)
+        if not content_decoded:
+            return content
+
+        if self.v1:
+            content_decoded = content_decoded.replace('{v1}', self.v1)
+
+        if self.v2:
+            content_decoded = content_decoded.replace('{v2}', self.v2)
+
+        if self.v3:
+            content_decoded = content_decoded.replace('{v3}', self.v3)
 
         return content_decoded
 
