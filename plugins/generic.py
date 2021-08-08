@@ -1134,6 +1134,13 @@ class Generic(Plugin):
 
         # GET website content
         self.html_text = self._res_text(self.url)
+
+        # Try to decode website content
+        try:
+            self.html_text = self.html_text.encode('utf-8').strip()
+        except:
+            pass
+
         # unpack common javascript codes
         self.html_text = unpack(self.html_text)
 
